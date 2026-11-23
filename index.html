@@ -1,0 +1,929 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>昇圧薬クエスト</title>
+<meta name="description" content="ICU薬剤師のための、触って学ぶ昇圧薬スライド。MAP65を守れ。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Dela+Gothic+One&family=DotGothic16&family=Zen+Kaku+Gothic+New:wght@400;700&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: the deck is a bedside patient monitor. Vital-sign colours (ECG green, arterial red, SpO2 cyan, alarm yellow) are the palette; each slide is one monitor "screen". Single dark theme by choice. */
+:root{
+  --bg:#06101d;
+  --panel:#0c1a2c;
+  --line:#1d3350;
+  --ink:#e4edf7;
+  --dim:#8ea3ba;
+  --hr:#3ee08a;
+  --abp:#ff5267;
+  --spo2:#3fd0ff;
+  --alarm:#ffc93c;
+  --display:"Dela Gothic One","Hiragino Sans","Yu Gothic",sans-serif;
+  --body:"Zen Kaku Gothic New","Hiragino Sans","Yu Gothic","Noto Sans JP",sans-serif;
+  --mono:"DotGothic16","Osaka-Mono",monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.6;overflow:hidden;-webkit-tap-highlight-color:transparent}
+button,select{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--spo2);outline-offset:2px}
+h1,h2,h3{font-family:var(--display);font-weight:400;line-height:1.25;text-wrap:balance;margin:0}
+.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+b{color:var(--ink)}
+
+.app{height:100%;display:grid;grid-template-rows:auto 1fr auto}
+.hud{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--line);background:linear-gradient(var(--panel),var(--bg))}
+.hud .logo{font-family:var(--display);font-size:15px;color:var(--hr);white-space:nowrap}
+.hud .spacer{flex:1}
+.hud .chip{font-family:var(--mono);font-size:14px;padding:2px 10px;border:1px solid var(--line);border-radius:4px;white-space:nowrap}
+.hud .xp{color:var(--alarm);border-color:#5a4a1a}
+.hud .xp.bump{animation:bump .5s}
+@keyframes bump{40%{transform:scale(1.25)}}
+
+.stage{position:relative;overflow:hidden;touch-action:pan-y}
+.track{display:flex;height:100%;transition:transform .45s cubic-bezier(.2,.8,.2,1)}
+.slide{flex:0 0 100%;height:100%;overflow-y:auto;padding:22px 16px 36px}
+.inner{max-width:940px;margin:0 auto;display:flex;flex-direction:column;gap:16px}
+.tag{font-family:var(--mono);font-size:13px;color:var(--spo2);letter-spacing:.08em}
+.slide h2{font-size:clamp(23px,4.4vw,34px)}
+.lead{color:var(--dim);max-width:64ch;margin:0}
+
+.nav{display:flex;align-items:center;gap:10px;padding:10px 16px;border-top:1px solid var(--line);background:var(--panel)}
+.nav .btn{min-width:84px}
+.dots{flex:1;display:flex;justify-content:center;gap:6px;flex-wrap:wrap}
+.dots button{width:10px;height:10px;border-radius:50%;border:0;background:var(--line);padding:0}
+.dots button.on{background:var(--hr);box-shadow:0 0 8px var(--hr)}
+.dots button.done{background:#2a6b4a}
+
+.btn{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 16px;transition:background .15s,border-color .15s,transform .1s}
+.btn:hover{border-color:var(--spo2)}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:var(--hr);color:#03140b;border-color:var(--hr);font-weight:700}
+.btn.ghost{background:transparent}
+.btn.sel{border-color:var(--alarm);background:#1d1a0c}
+.btn[disabled]{opacity:.4;cursor:default}
+
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px}
+.note{font-size:13px;color:var(--dim);margin:0}
+
+.monitor{background:#020910;border:2px solid var(--line);border-radius:12px;padding:12px 16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(84px,1fr));gap:10px}
+.vital{display:flex;flex-direction:column}
+.vital .lbl{font-family:var(--mono);font-size:12px;letter-spacing:.1em}
+.vital .val{font-family:var(--mono);font-size:clamp(28px,7vw,52px);line-height:1}
+.vital .unit{font-size:12px;color:var(--dim)}
+.v-hr{color:var(--hr)} .v-abp{color:var(--abp)} .v-sp{color:var(--spo2)} .v-al{color:var(--alarm)}
+.alarm{animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:.35}}
+.say{font-family:var(--mono);font-size:15px;color:var(--alarm);min-height:1.6em}
+
+.tabs{display:flex;gap:6px;flex-wrap:wrap}
+.tabs .btn{padding:8px 12px;font-size:14px}
+.tabs .btn.done::after{content:" ✓";color:var(--hr)}
+
+/* title */
+.hero h1{font-size:clamp(40px,10vw,82px);letter-spacing:.02em}
+.hero h1 span{color:var(--abp)}
+.hero .sub{font-size:clamp(15px,2.5vw,19px);color:var(--dim);margin:0}
+#ecg{width:100%;height:100px;display:block;background:#020910;border:2px solid var(--line);border-radius:12px}
+.def{border-left:4px solid var(--abp);background:var(--panel);padding:12px 14px;border-radius:0 10px 10px 0}
+.def strong{font-family:var(--display);font-weight:400;color:var(--abp)}
+
+/* MAP wave */
+#wave{width:100%;height:auto;display:block;background:#020910;border:2px solid var(--line);border-radius:12px}
+.ctrl{display:grid;gap:2px}
+.ctrl label{display:flex;justify-content:space-between;font-size:14px}
+.ctrl label .num{color:var(--spo2)}
+input[type=range]{width:100%;accent-color:var(--spo2);height:28px}
+.formula{font-family:var(--mono);font-size:clamp(15px,2.8vw,19px);background:#020910;border:1px dashed var(--line);border-radius:8px;padding:10px 14px;overflow-x:auto}
+.mission{border:1px solid #5a4a1a;background:#1d1a0c;border-radius:10px;padding:10px 14px;font-size:14px}
+.mission.ok{border-color:var(--hr);background:#0d2a1d}
+
+/* levers */
+.levers{display:grid;gap:10px}
+.lever{display:grid;grid-template-columns:110px 1fr 64px;gap:10px;align-items:center;font-size:14px}
+.lever .nm small{display:block;color:var(--dim);font-size:11px;line-height:1.3}
+.lbar{position:relative;height:18px;background:#020910;border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.lbar .band{position:absolute;top:0;bottom:0;background:rgba(62,224,138,.13);border-left:1px dashed #2a6b4a;border-right:1px dashed #2a6b4a}
+.lbar .ghost{position:absolute;top:3px;bottom:3px;left:0;background:#3a4d66;border-radius:2px}
+.lbar .fill{position:absolute;top:6px;bottom:6px;left:0;background:var(--spo2);border-radius:2px;transition:width .7s cubic-bezier(.2,.8,.2,1)}
+.lever .v{font-family:var(--mono);text-align:right}
+.lever .v.up{color:var(--hr)} .lever .v.dn{color:var(--abp)}
+.drugs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.drugs .btn{padding:10px 6px;font-size:14px;line-height:1.3}
+.drugs .btn small{display:block;font-size:11px;color:var(--dim)}
+.drugs .btn.best{border-color:var(--hr);background:#0d2a1d}
+.drugs .btn.ok{border-color:var(--alarm)}
+.drugs .btn.ng{border-color:var(--abp);background:#2a0d13}
+.verdict{border-radius:10px;padding:12px 14px;background:#020910;border:1px solid var(--line);font-size:15px;min-height:72px}
+.verdict .h{font-family:var(--display);font-size:16px;display:block;margin-bottom:2px}
+.verdict.best .h{color:var(--hr)} .verdict.ok .h{color:var(--alarm)} .verdict.ng .h{color:var(--abp)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:13px;color:var(--dim)}
+.legend b{color:var(--spo2);font-weight:700}
+
+/* organ map */
+.roster{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.fighter{background:var(--panel);border:2px solid var(--line);border-radius:10px;padding:8px 4px;text-align:center;font-family:var(--display);font-size:14px;line-height:1.3}
+.fighter small{display:block;font-family:var(--body);font-size:11px;color:var(--dim)}
+.fighter.on{border-color:var(--alarm);background:#1d1a0c}
+.fighter.seen::after{content:"✓";color:var(--hr);font-family:var(--body);font-size:12px;display:block}
+.mapwrap{display:grid;grid-template-columns:minmax(0,1.05fr) minmax(0,1fr);gap:14px;align-items:start}
+@media (max-width:760px){.mapwrap{grid-template-columns:1fr}}
+#body{width:100%;height:auto;display:block;background:#020910;border:2px solid var(--line);border-radius:12px}
+#body .org rect{fill:#0c1a2c;stroke:#1d3350;stroke-width:1.5;transition:fill .3s,stroke .3s}
+#body .org .t{fill:#e4edf7;font-family:var(--body);font-size:13px;font-weight:700}
+#body .org .e{font-family:var(--mono);font-size:11.5px;fill:transparent;transition:fill .3s}
+#body .org.on rect{fill:#0d2a1d;stroke:#3ee08a;stroke-width:2.5}
+#body .org.on .e{fill:#3ee08a}
+#body .org.side rect{fill:#2a0d13;stroke:#ff5267;stroke-width:2.5}
+#body .org.side .e{fill:#ff5267}
+#body .org.info rect{fill:#0a2230;stroke:#3fd0ff;stroke-width:2.5}
+#body .org.info .e{fill:#3fd0ff}
+#body .flow{stroke:#2d4a6b;stroke-width:3;fill:none;stroke-dasharray:6 6;animation:flow 1.2s linear infinite}
+#body .flow.a{stroke:#6b2d3a} #body .flow.v{stroke:#2d4a6b}
+@keyframes flow{to{stroke-dashoffset:-24}}
+.effects{display:grid;gap:6px;margin:0;padding:0;list-style:none;font-size:14px}
+.effects li{display:grid;grid-template-columns:12px 1fr;gap:8px;align-items:start}
+.effects li::before{content:"";width:10px;height:10px;border-radius:2px;margin-top:6px;background:var(--c)}
+.statcard{display:grid;gap:10px}
+.statcard h3{font-size:22px;color:var(--alarm)}
+.quote{font-family:var(--mono);color:var(--spo2);font-size:14px}
+.rec{display:flex;flex-wrap:wrap;gap:6px}
+.rec span{font-family:var(--mono);font-size:12px;border:1px solid var(--line);border-radius:4px;padding:1px 8px;color:var(--dim)}
+.rec span.on{border-color:var(--hr);color:var(--hr)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:14px;margin:0}
+.kv dt{color:var(--dim)} .kv dd{margin:0}
+.maplegend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--dim)}
+.maplegend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+
+/* VS */
+.vs{display:grid;grid-template-columns:1fr auto 1fr;gap:10px;align-items:stretch}
+.vs .side{background:var(--panel);border:2px solid var(--line);border-radius:12px;padding:14px;text-align:left;display:grid;gap:6px;align-content:start}
+.vs .side h3{font-size:20px}
+.vs .side ul{margin:0;padding-left:1.1em;font-size:13px;color:var(--dim)}
+.vs .side.win{border-color:var(--hr);background:#0d2a1d}
+.vs .side.lose{opacity:.55}
+.vs .side.pick{border-color:var(--alarm)}
+.vs .mid{font-family:var(--display);font-size:28px;color:var(--abp);align-self:center}
+@media (max-width:560px){.vs{grid-template-columns:1fr}.vs .mid{text-align:center;font-size:20px}}
+.scene{font-size:17px;margin:0}
+
+/* quiz */
+.opts{display:grid;gap:8px}
+.opt{text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.opt.right{border-color:var(--hr);background:#0d2a1d}
+.opt.wrong{border-color:var(--abp);background:#2a0d13}
+.feedback{min-height:1.6em;font-size:15px}
+.feedback.ok{color:var(--hr)} .feedback.ng{color:var(--abp)}
+
+/* boss */
+.boss{display:grid;grid-template-columns:1.05fr 1fr;gap:14px}
+@media (max-width:760px){.boss{grid-template-columns:1fr}}
+.actions{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.actions .btn{text-align:left;font-size:14px;padding:10px 12px;line-height:1.35}
+.log{font-family:var(--mono);font-size:13px;background:#020910;border:1px solid var(--line);border-radius:8px;padding:10px;height:150px;overflow-y:auto;display:flex;flex-direction:column;gap:4px}
+.log .g{color:var(--hr)} .log .r{color:var(--abp)} .log .y{color:var(--alarm)}
+.pills{display:flex;flex-wrap:wrap;gap:6px;min-height:26px}
+.pill{font-family:var(--mono);font-size:12px;border:1px solid var(--hr);color:var(--hr);border-radius:20px;padding:1px 10px}
+.mapbar{position:relative;height:14px;background:#020910;border:1px solid var(--line);border-radius:4px;overflow:hidden}
+.mapbar i{position:absolute;inset:0 auto 0 0;background:var(--abp);transition:width .6s}
+.mapbar .goal{position:absolute;top:0;bottom:0;border-left:2px dashed var(--hr)}
+.goaltxt{font-family:var(--mono);font-size:13px;color:var(--hr)}
+
+/* flips */
+.flips{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px}
+.flip{position:relative;perspective:800px;height:150px;border:0;background:none;padding:0}
+.flip .face{position:absolute;inset:0;border-radius:12px;border:1px solid var(--line);display:flex;flex-direction:column;justify-content:center;align-items:center;padding:12px;backface-visibility:hidden;transition:transform .5s;text-align:center}
+.flip .front{background:var(--panel)}
+.flip .front .big{font-family:var(--mono);font-size:32px;color:var(--alarm);line-height:1.1}
+.flip .front small{color:var(--dim);font-size:12px;margin-top:6px}
+.flip .back{background:#0d2a1d;transform:rotateY(180deg);font-size:13px;line-height:1.5}
+.flip.open .front{transform:rotateY(180deg)}
+.flip.open .back{transform:rotateY(360deg)}
+
+/* swipe */
+.deck{position:relative;height:220px;max-width:420px;width:100%;margin:0 auto;touch-action:none}
+.scard{position:absolute;inset:0;background:var(--panel);border:2px solid var(--line);border-radius:16px;padding:20px;display:flex;flex-direction:column;justify-content:center;gap:10px;font-size:17px;user-select:none;cursor:grab;transition:transform .3s,opacity .3s}
+.scard .no{font-family:var(--mono);font-size:12px;color:var(--dim)}
+.scard .stamp{position:absolute;top:14px;font-family:var(--display);font-size:22px;padding:2px 10px;border:3px solid;border-radius:6px;opacity:0}
+.scard .stamp.l{left:14px;color:var(--abp);transform:rotate(-12deg)}
+.scard .stamp.r{right:14px;color:var(--hr);transform:rotate(12deg)}
+.swbtns{display:flex;justify-content:center;gap:12px}
+.swbtns .btn{min-width:130px;font-family:var(--display)}
+.btn.no{border-color:var(--abp);color:var(--abp)}
+.btn.yes{border-color:var(--hr);color:var(--hr)}
+
+/* order */
+.order{display:grid;gap:8px}
+.step{display:flex;align-items:center;gap:12px;text-align:left;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px 14px}
+.step .n{font-family:var(--mono);width:26px;height:26px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;flex:none}
+.step.done{border-color:var(--hr)}
+.step.done .n{background:var(--hr);color:#03140b;border-color:var(--hr)}
+.step.shake{animation:shake .35s}
+@keyframes shake{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+
+/* result */
+.rank{font-family:var(--display);font-size:clamp(30px,7vw,52px);color:var(--alarm)}
+.share{font-family:var(--mono);font-size:14px;background:#020910;border:1px solid var(--line);border-radius:8px;padding:12px;white-space:pre-wrap}
+.refs{font-size:13px;color:var(--dim);display:grid;gap:4px}
+.refs a{color:var(--spo2)}
+
+.toast{position:fixed;left:50%;top:60px;transform:translate(-50%,-20px);background:#1d1a0c;border:1px solid var(--alarm);color:var(--alarm);font-family:var(--mono);padding:8px 16px;border-radius:8px;opacity:0;pointer-events:none;transition:opacity .25s,transform .25s;z-index:10;max-width:90vw;text-align:center}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+@media (max-width:520px){
+  .fighter{font-size:12px;padding:8px 2px}
+  .actions{grid-template-columns:1fr}
+  .drugs{grid-template-columns:repeat(3,1fr)}
+  .lever{grid-template-columns:86px 1fr 56px;gap:8px}
+  .hud .logo{font-size:13px}
+  .nav .btn{min-width:62px;padding:10px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="hud">
+    <div class="logo">昇圧薬クエスト</div>
+    <div class="spacer"></div>
+    <div class="chip xp" id="xp" aria-live="polite">XP 0</div>
+    <div class="chip" id="pager">1/12</div>
+  </header>
+
+  <main class="stage" id="stage">
+    <div class="track" id="track">
+
+<!-- 1 TITLE -->
+<section class="slide" aria-label="タイトル">
+  <div class="inner hero">
+    <div class="tag">BED 01 ／ 救急領域 循環（昇圧）編</div>
+    <h1>昇圧薬クエスト<br><span>MAP65を守れ</span></h1>
+    <canvas id="ecg" aria-hidden="true"></canvas>
+    <div class="monitor" aria-label="患者モニター">
+      <div class="vital"><span class="lbl v-hr">HR 心拍数</span><span class="val v-hr num">118</span><span class="unit">bpm</span></div>
+      <div class="vital"><span class="lbl v-abp">MAP 平均動脈圧</span><span class="val v-abp num alarm">52</span><span class="unit">mmHg</span></div>
+      <div class="vital"><span class="lbl v-al">LAC 乳酸</span><span class="val v-al num">4.8</span><span class="unit">mmol/L</span></div>
+    </div>
+    <div class="def"><strong>MAP（平均動脈圧）</strong>は、心臓が1拍するあいだの血圧の平均。臓器に血液を押し込む力そのもので、ショックではまず<b>65 mmHg</b>を目指します。このMAPを維持するための薬物療法について学びましょう。</div>
+    <p class="sub">薬の作用部位や使い分け、簡単な症例をミニゲーム形式で。正解数に応じて、最後に称号がもらえます。</p>
+    <div><button class="btn primary" data-go="1">はじめる →</button></div>
+    <p class="note">操作：左右にスワイプ、← → キー、または下のボタン。</p>
+  </div>
+</section>
+
+<!-- 2 MAP -->
+<section class="slide" aria-label="MAPとは">
+  <div class="inner">
+    <div class="tag">STAGE 1 ／ そもそもMAPって？</div>
+    <h2>MAPは「拡張期寄り」の平均</h2>
+    <p class="lead">心臓は1拍の<b>約1/3が収縮期、約2/3が拡張期</b>のため、平均は拡張期血圧に寄ります。つまみを動かしながら、収縮期・拡張期の血圧とMAPの関係について、イメージを掴みましょう。</p>
+    <div class="formula">MAP ＝ 拡張期血圧 ＋（収縮期血圧 − 拡張期血圧）÷ 3</div>
+    <svg id="wave" viewBox="0 0 640 260" role="img" aria-label="動脈圧波形"></svg>
+    <div class="grid2">
+      <div class="card noswipe" style="display:grid;gap:10px">
+        <div class="ctrl"><label for="sSBP">収縮期血圧（上）<span class="num" id="oSBP"></span></label><input type="range" id="sSBP" min="60" max="180" value="96"></div>
+        <div class="ctrl"><label for="sDBP">拡張期血圧（下）<span class="num" id="oDBP"></span></label><input type="range" id="sDBP" min="25" max="110" value="38"></div>
+      </div>
+      <div style="display:grid;gap:10px;align-content:start">
+        <div class="mission" id="mission"><b>ミッション：</b>「上の血圧は100以上あるのに、MAPは65未満」という状態を作ってください。敗血症でよく見る落とし穴です。</div>
+        <p class="note">MAP＜65では腎臓や脳の自己調節が効きにくくなります。臓器にかかる実際の灌流圧は「MAP − 出口側の圧（CVP・頭蓋内圧・腹腔内圧）」。冠動脈は主に拡張期に流れるので、拡張期血圧も見ます。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 3 LEVERS -->
+<section class="slide" aria-label="3つのレバー">
+  <div class="inner">
+    <div class="tag">STAGE 2 ／ どのレバーを、どの薬で引く？</div>
+    <h2>MAP ＝ 心拍出量 × 血管抵抗</h2>
+    <p class="lead">血圧を作るレバーは<b>前負荷（容量）・心収縮力・血管抵抗</b>の3本。症例を選び、落ちているレバーを見極めて薬を1つ選んでください。灰色が投与前、青が投与後です。</p>
+    <div class="legend"><span><b>前負荷</b>→ 輸液・輸血</span><span><b>心収縮力</b>→ ドブタミン・ミルリノン</span><span><b>血管抵抗</b>→ ノルアドレナリン・バソプレシン・フェニレフリン</span></div>
+    <div class="tabs" id="lvTabs"></div>
+    <div class="card" style="display:grid;gap:12px">
+      <p style="margin:0" id="lvDesc"></p>
+      <div class="levers" id="levers"></div>
+      <div class="monitor">
+        <div class="vital"><span class="lbl v-abp">MAP</span><span class="val v-abp num" id="lvMAP"></span><span class="unit">mmHg</span></div>
+        <div class="vital"><span class="lbl v-sp">CO 心拍出量</span><span class="val v-sp num" id="lvCO"></span><span class="unit">L/min</span></div>
+      </div>
+    </div>
+    <div class="drugs" id="lvDrugs"></div>
+    <div class="verdict" id="lvVerdict" aria-live="polite"><span class="h">薬を選んでください</span>どのレバーが動くかを予想してからタップすると覚えやすいです。</div>
+    <p class="note">数字は学習用の簡易モデル（MAP ≈ CVP ＋ CO × SVR ÷ 80）です。</p>
+  </div>
+</section>
+
+<!-- 4 ORGAN MAP -->
+<section class="slide" aria-label="作用部位マップ">
+  <div class="inner">
+    <div class="tag">STAGE 3 ／ キャラクター選択 × 作用部位マップ</div>
+    <h2>8種類の薬剤は、体のどこに効く？</h2>
+    <p class="lead">薬をタップすると、循環図の上で効く場所が光ります。<b>緑＝主作用、赤＝副作用・注意、青＝知っておきたい特徴</b>。全員見るとボーナスXP。</p>
+    <div class="roster" id="roster"></div>
+    <div class="mapwrap">
+      <div style="display:grid;gap:6px">
+        <svg id="body" viewBox="0 0 360 400" role="img" aria-label="循環と臓器の図"></svg>
+        <div class="maplegend"><span><i style="background:var(--hr)"></i>主作用</span><span><i style="background:var(--abp)"></i>副作用・注意</span><span><i style="background:var(--spo2)"></i>特徴</span><span><i style="background:#6b2d3a"></i>動脈側</span><span><i style="background:#2d4a6b"></i>静脈側</span></div>
+      </div>
+      <div class="card statcard" id="statcard" aria-live="polite"></div>
+    </div>
+  </div>
+</section>
+
+<!-- 5 VS -->
+<section class="slide" aria-label="VS対決">
+  <div class="inner">
+    <div class="tag">STAGE 4 ／ VS対決</div>
+    <h2>この場面、どっちが最適？</h2>
+    <p class="lead">場面を読んで、最適と思う薬をタップ。理由と根拠が出ます。</p>
+    <div class="tabs" id="vsTabs"></div>
+    <p class="scene" id="vsScene"></p>
+    <div class="vs" id="vsBox"></div>
+    <div class="verdict" id="vsVerdict" aria-live="polite"><span class="h">予想してください</span>受容体と、この場面で困っていることを考えて。</div>
+  </div>
+</section>
+
+<!-- 6 CALC -->
+<section class="slide" aria-label="流量計算">
+  <div class="inner">
+    <div class="tag">STAGE 5 ／ 流量計算</div>
+    <h2>γ（μg/kg/min）と mL/h を使いこなす</h2>
+    <div class="formula">mL/h ＝ 用量(μg/kg/min) × 体重(kg) × 60 ÷ 濃度(μg/mL)</div>
+    <div class="grid2">
+      <div class="card noswipe" style="display:grid;gap:10px">
+        <div class="ctrl"><label for="cDrug">薬剤・濃度</label>
+          <select id="cDrug" class="btn" style="text-align:left">
+            <option value="60|0.02|0.5|0.1">NAD 3 mg/50 mL（60 μg/mL）</option>
+            <option value="100|0.02|0.5|0.1">NAD 5 mg/50 mL（100 μg/mL）</option>
+            <option value="60|0.01|0.5|0.05">AD 3 mg/50 mL（60 μg/mL）</option>
+            <option value="3000|1|20|3">DOB 0.3%（3,000 μg/mL）</option>
+            <option value="3000|1|20|3">DOA 0.3%（3,000 μg/mL）</option>
+          </select>
+        </div>
+        <div class="ctrl"><label for="cW">体重 <span class="num" id="oW"></span></label><input type="range" id="cW" min="30" max="120" value="50"></div>
+        <div class="ctrl"><label for="cD">用量 <span class="num" id="oD"></span></label><input type="range" id="cD" min="0.02" max="0.5" step="0.01" value="0.1"></div>
+      </div>
+      <div style="display:grid;gap:10px;align-content:start">
+        <div class="monitor"><div class="vital"><span class="lbl v-sp">PUMP 流量</span><span class="val v-sp num" id="oRate">5.0</span><span class="unit">mL/h</span></div></div>
+        <p class="note">覚え方：NAD 3 mg/50 mL・体重50 kg なら 1 mL/h ＝ 0.02 μg/kg/min。</p>
+      </div>
+    </div>
+    <div class="card" style="display:grid;gap:10px">
+      <h3 style="font-size:18px">暗算チャレンジ <span class="num" id="qNo" style="color:var(--dim);font-size:14px"></span></h3>
+      <p style="margin:0" id="qText"></p>
+      <div class="opts" id="qOpts"></div>
+      <div class="feedback" id="qFb" aria-live="polite"></div>
+    </div>
+  </div>
+</section>
+
+<!-- 7 BOSS -->
+<section class="slide" aria-label="ボス戦">
+  <div class="inner">
+    <div class="tag v-abp">BOSS RUSH ／ 5症例</div>
+    <h2 id="bTitle"></h2>
+    <div class="tabs" id="bTabs"></div>
+    <p class="lead" id="bDesc"></p>
+    <div class="boss">
+      <div style="display:grid;gap:10px;align-content:start">
+        <div class="monitor" id="bMon"></div>
+        <div class="mapbar" aria-hidden="true"><i id="bBar"></i><span class="goal" style="left:65%"></span></div>
+        <div class="goaltxt" id="bGoal"></div>
+        <div class="pills" id="bPills"></div>
+        <div class="log" id="bLog" aria-live="polite"></div>
+      </div>
+      <div style="display:grid;gap:10px;align-content:start">
+        <div class="actions" id="bActs"></div>
+        <button class="btn ghost" id="bReset">この症例をやり直す</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 8 FLIPS -->
+<section class="slide" aria-label="SSC 2026の数字">
+  <div class="inner">
+    <div class="tag">STAGE 6 ／ めくって覚える</div>
+    <h2>SSC 2026 の数字、6枚</h2>
+    <p class="lead">2026年3月に改訂された国際ガイドラインの要点です。タップで裏返ります。全部めくるとXP獲得。</p>
+    <div class="flips" id="flips"></div>
+    <p class="note">「推奨」は強い推奨、「提案」は弱い推奨。カッコ内はエビデンスの確実性。</p>
+  </div>
+</section>
+
+<!-- 9 QUICK -->
+<section class="slide" aria-label="薬剤クイズ">
+  <div class="inner">
+    <div class="tag">STAGE 7 ／ 薬剤師の早押し</div>
+    <h2>副作用・相互作用・剤形、5問</h2>
+    <div class="card" style="display:grid;gap:12px">
+      <div class="num" id="fNo" style="color:var(--dim)"></div>
+      <p style="margin:0;font-size:18px" id="fText"></p>
+      <div class="opts" id="fOpts"></div>
+      <div class="feedback" id="fFb" aria-live="polite"></div>
+      <div><button class="btn" id="fNext" hidden>次の問題 →</button></div>
+    </div>
+  </div>
+</section>
+
+<!-- 10 SWIPE -->
+<section class="slide" aria-label="ラインのアリナシ">
+  <div class="inner">
+    <div class="tag">STAGE 8 ／ スワイプ判定</div>
+    <h2>このライン操作、アリ？ナシ？</h2>
+    <p class="lead">右にスワイプで<b>アリ</b>、左で<b>ナシ</b>。ボタンでも答えられます。</p>
+    <div class="deck noswipe" id="deck"></div>
+    <div class="swbtns"><button class="btn no" id="swNo">← ナシ</button><button class="btn yes" id="swYes">アリ →</button></div>
+    <div class="feedback" id="swFb" aria-live="polite" style="text-align:center"></div>
+  </div>
+</section>
+
+<!-- 11 ORDER -->
+<section class="slide" aria-label="離脱の順番">
+  <div class="inner">
+    <div class="tag">STAGE 9 ／ 並べ替え</div>
+    <h2>ショックを抜けた。何から減らす？</h2>
+    <p class="lead">減らす（やめる）順にタップ。一般的な順序で、実際は施設のプロトコルに従います。</p>
+    <div class="order" id="order"></div>
+    <div class="feedback" id="oFb" aria-live="polite"></div>
+  </div>
+</section>
+
+<!-- 12 RESULT -->
+<section class="slide" aria-label="結果">
+  <div class="inner">
+    <div class="tag">DISCHARGE ／ 退室サマリー</div>
+    <h2>あなたの称号</h2>
+    <div class="rank" id="rank">—</div>
+    <div class="monitor">
+      <div class="vital"><span class="lbl v-al">XP</span><span class="val v-al num" id="rXP">0</span><span class="unit" id="rMax"></span></div>
+      <div class="vital"><span class="lbl v-hr">CLEAR</span><span class="val v-hr num" id="rClear">0</span><span class="unit">/ 9 ステージ</span></div>
+      <div class="vital"><span class="lbl v-abp">BOSS</span><span class="val v-abp num" id="rBoss">0</span><span class="unit">/ 5 症例</span></div>
+    </div>
+    <div class="share" id="shareText"></div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn primary" id="copyBtn">結果をコピー</button>
+      <button class="btn" id="restart">はじめからもう一度</button>
+    </div>
+    <div class="feedback" id="copyFb" aria-live="polite"></div>
+    <div class="refs">
+      <strong style="color:var(--ink)">参考にしたもの</strong>
+      <a href="https://www.sccm.org/clinical-resources/guidelines/guidelines/surviving-sepsis-campaign-international-guidelines-for-management-of-sepsis-and-septic-shock-2026">Surviving Sepsis Campaign 2026（SCCM）</a>
+      <a href="https://jsicm.org/pdf/cq/J-SSCG2024/bundle.pdf">日本版敗血症診療ガイドライン2024 バンドル（日本集中治療医学会）</a>
+      <a href="https://www.jsicm.org/pdf/cq/J-SSCG2024/J-SSCG2024_Main.pdf">日本版敗血症診療ガイドライン2024 本文</a>
+      <span>試験：SOAP II、ADRENAL、APROCCHSS、LOVIT、OptimaCC、ATHOS-3、DOREMI</span>
+    </div>
+    <p class="note">教育用のコンテンツです。用量は成人の一般的な目安です。実際の投与は最新の添付文書や施設プロトコル等をご確認ください。バソプレシンの敗血症性ショックは本邦では適応外、アンジオテンシンIIは本邦未承認です。</p>
+  </div>
+</section>
+
+    </div>
+  </main>
+
+  <nav class="nav" aria-label="スライド移動">
+    <button class="btn" id="prev">← 前へ</button>
+    <div class="dots" id="dots"></div>
+    <button class="btn primary" id="next">次へ →</button>
+  </nav>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+(function(){
+const $=s=>document.querySelector(s);
+const $$=s=>[...document.querySelectorAll(s)];
+const el=(tag,cls,html)=>{const e=document.createElement(tag);if(cls)e.className=cls;if(html!=null)e.innerHTML=html;return e};
+const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a};
+const MAX=257;
+let S={i:0,xp:0,got:{},clear:{},boss:{}};
+
+/* ---------- XP ---------- */
+let toastT;
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),2200)}
+function award(id,pts,msg){if(S.got[id])return;S.got[id]=pts;S.xp+=pts;const x=$('#xp');x.textContent='XP '+S.xp;x.classList.remove('bump');void x.offsetWidth;x.classList.add('bump');toast('+'+pts+' XP　'+(msg||''))}
+function clear(k){S.clear[k]=1;renderDots()}
+
+/* ---------- nav ---------- */
+const track=$('#track'),slides=$$('.slide'),N=slides.length;
+function renderDots(){const d=$('#dots');d.innerHTML='';slides.forEach((s,k)=>{const b=el('button',k===S.i?'on':(S.clear[k]?'done':''));b.setAttribute('aria-label',(k+1)+'枚目へ');b.onclick=()=>go(k);d.appendChild(b)})}
+function go(k){S.i=Math.max(0,Math.min(N-1,k));track.style.transform='translateX('+(-100*S.i)+'%)';$('#pager').textContent=(S.i+1)+'/'+N;
+  $('#prev').disabled=S.i===0;$('#next').disabled=S.i===N-1;renderDots();slides.forEach((s,k)=>s.setAttribute('aria-hidden',k!==S.i));if(S.i===N-1)renderResult()}
+$('#prev').onclick=()=>go(S.i-1);$('#next').onclick=()=>go(S.i+1);
+$$('[data-go]').forEach(b=>b.onclick=()=>go(+b.dataset.go));
+document.addEventListener('keydown',e=>{if(e.target.matches('input,select'))return;if(e.key==='ArrowRight')go(S.i+1);if(e.key==='ArrowLeft')go(S.i-1)});
+(()=>{let x0=null,y0=0;const st=$('#stage');
+  st.addEventListener('pointerdown',e=>{if(e.target.closest('.noswipe,input,select'))return;x0=e.clientX;y0=e.clientY});
+  st.addEventListener('pointerup',e=>{if(x0===null)return;const dx=e.clientX-x0,dy=e.clientY-y0;x0=null;if(Math.abs(dx)>60&&Math.abs(dx)>Math.abs(dy)*1.5)go(S.i+(dx<0?1:-1))});
+  st.addEventListener('pointercancel',()=>x0=null);
+})();
+
+/* ---------- 1 ECG ---------- */
+(()=>{const c=$('#ecg'),g=c.getContext('2d');let t=0;const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function size(){c.width=c.clientWidth*devicePixelRatio;c.height=c.clientHeight*devicePixelRatio}size();addEventListener('resize',size);
+  function y(p){if(p<.10)return 0;if(p<.14)return -.12*Math.sin((p-.10)/.04*Math.PI);if(p<.20)return 0;if(p<.22)return .15;if(p<.25)return -1;if(p<.28)return .35;if(p<.40)return 0;if(p<.52)return -.25*Math.sin((p-.40)/.12*Math.PI);return 0}
+  function draw(){const w=c.width,h=c.height,beat=w/3.2;g.clearRect(0,0,w,h);g.strokeStyle='#123';g.lineWidth=1;
+    for(let x=0;x<w;x+=20*devicePixelRatio){g.beginPath();g.moveTo(x,0);g.lineTo(x,h);g.stroke()}
+    g.strokeStyle='#3ee08a';g.lineWidth=2.2*devicePixelRatio;g.shadowColor='#3ee08a';g.shadowBlur=8;g.beginPath();
+    for(let x=0;x<w;x+=2){const p=((x+t)%beat)/beat,yy=h*.55+y(p)*h*.38;x?g.lineTo(x,yy):g.moveTo(x,yy)}
+    g.stroke();g.shadowBlur=0;if(!reduce){t+=3*devicePixelRatio;requestAnimationFrame(draw)}}
+  draw();
+})();
+
+/* ---------- 2 MAP wave ---------- */
+(()=>{const sb=$('#sSBP'),db=$('#sDBP'),svg=$('#wave');
+  const Y=p=>245-(p-15)*1.3; // mmHg -> y
+  function wave(sbp,dbp){const pts=[],W=640,beat=260;
+    for(let x=0;x<=W;x+=3){const t=(x%beat)/beat;let p;
+      if(t<.12)p=dbp+(sbp-dbp)*Math.sin(t/.12*Math.PI/2);
+      else if(t<.34)p=sbp-(sbp-dbp)*.38*((t-.12)/.22);
+      else if(t<.38)p=sbp-(sbp-dbp)*(.38+.10*((t-.34)/.04));
+      else if(t<.43)p=sbp-(sbp-dbp)*(.48-.07*((t-.38)/.05));
+      else{const k=3.2,e0=Math.exp(-k*.57),f=(Math.exp(-k*(t-.43))-e0)/(1-e0);p=dbp+(sbp-(sbp-dbp)*.41-dbp)*f}
+      pts.push(x+','+Y(p).toFixed(1))}
+    return pts.join(' ')}
+  function line(y,c,label,dash){return `<line x1="0" x2="640" y1="${y}" y2="${y}" stroke="${c}" stroke-width="1.5" ${dash?'stroke-dasharray="6 5"':''}/><text x="${dash?330:634}" y="${y-6}" text-anchor="${dash?'middle':'end'}" fill="${c}" font-family="DotGothic16,monospace" font-size="20">${label}</text>`}
+  function upd(){let s=+sb.value,d=+db.value;if(d>s-15){d=s-15;db.value=d}
+    const m=Math.round(d+(s-d)/3);
+    $('#oSBP').textContent=s+' mmHg';$('#oDBP').textContent=d+' mmHg';
+    let g='';for(let p=20;p<=180;p+=20)g+=`<line x1="0" x2="640" y1="${Y(p)}" y2="${Y(p)}" stroke="#0f2236" stroke-width="1"/>`;
+    svg.innerHTML=g+line(Y(65),'#3ee08a','目標 65',true)+
+      `<polyline points="${wave(s,d)}" fill="none" stroke="#ff5267" stroke-width="4" stroke-linejoin="round"/>`+
+      line(Y(s),'#8ea3ba','収縮期 '+s)+line(Y(d),'#8ea3ba','拡張期 '+d)+
+      `<line x1="0" x2="640" y1="${Y(m)}" y2="${Y(m)}" stroke="#ffc93c" stroke-width="3"/><rect x="6" y="${Y(m)-34}" width="190" height="30" rx="5" fill="#1d1a0c" stroke="#ffc93c"/><text x="16" y="${Y(m)-12}" fill="#ffc93c" font-family="DotGothic16,monospace" font-size="21">MAP ${m} mmHg</text>`;
+    const ms=$('#mission');
+    if(s>=100&&m<65){ms.classList.add('ok');ms.innerHTML=`<b>ミッション成功：</b>${s}/${d} で MAP ${m}。上の血圧だけ見て安心すると見逃します。拡張期が低い＝血管が開いている（SVR低下）サイン。`;award('mapm',10,'落とし穴を発見');clear(1)}
+  }
+  sb.oninput=upd;db.oninput=upd;upd();
+})();
+
+/* ---------- 3 LEVERS ---------- */
+(()=>{
+  const BSA=1.7;
+  const L=[
+    {k:'cvp',n:'前負荷',s:'CVP（容量）',u:'mmHg',min:0,max:24,lo:6,hi:12,f:v=>v.toFixed(0)},
+    {k:'ci',n:'心収縮力',s:'CI 心係数',u:'L/min/m²',min:0,max:6,lo:2.5,hi:4,f:v=>v.toFixed(1)},
+    {k:'svr',n:'血管抵抗',s:'SVR',u:'',min:300,max:2100,lo:800,hi:1200,f:v=>v.toFixed(0)},
+    {k:'hr',n:'心拍数',s:'HR',u:'bpm',min:30,max:170,lo:60,hi:100,f:v=>v.toFixed(0)}
+  ];
+  const D={
+    fluid:{n:'輸液・輸血',s:'前負荷',v:{cvp:5,ci:.1,svr:-40,hr:-2}},
+    nad:{n:'NAD',s:'血管抵抗＋少し収縮',v:{cvp:1,ci:.2,svr:160,hr:2}},
+    vp:{n:'VP',s:'血管抵抗',v:{cvp:0,ci:-.1,svr:140,hr:-3}},
+    pe:{n:'PE',s:'血管抵抗のみ',v:{cvp:1,ci:-.3,svr:200,hr:-8}},
+    dob:{n:'DOB',s:'心収縮力',v:{cvp:-1,ci:.8,svr:-150,hr:12}},
+    mil:{n:'MIL',s:'心収縮力＋血管拡張',v:{cvp:-2,ci:.7,svr:-250,hr:5}}
+  };
+  const C=[
+    {n:'敗血症',d:'肺炎の68歳。輸液 30 mL/kg 後もMAPが低い。四肢は温かく、拡張期血圧 35。',b:{cvp:9,ci:4.2,svr:520,hr:118},
+      r:{nad:['best','正解：血管抵抗のレバー','輸液は入ったのにSVRが低いまま。NADで血管を締めるのが第一選択です。'],
+         vp:['ok','2番手：NADの後に足す薬','効きますが、VPは単独の第一選択ではありません。NADが増えてきたら追加します。'],
+         pe:['ok','使えなくはない','βがないぶんCOがやや落ちます。頻脈性不整脈でβを避けたいときの選択肢。'],
+         fluid:['ng','前負荷はもう足りている','CVPは9。さらに入れても血圧は少ししか上がらず、肺が水浸しになります。'],
+         dob:['ng','逆のレバー','COはすでに高い。DOBはβ2で血管を開き、MAPはむしろ下がりました。'],
+         mil:['ng','逆のレバー','強い血管拡張でSVRがさらに低下。拡張性ショックでは危険です。']}},
+    {n:'心原性',d:'前壁梗塞の72歳。MAP 65はかろうじてあるが、手足は冷たく乳酸が上昇、尿が出ない。PAWP 24。',b:{cvp:16,ci:1.7,svr:1350,hr:100},
+      r:{dob:['best','正解：心収縮力のレバー','圧はあるのにポンプが弱い（CI 1.7）。DOBで拍出を上げます。血圧が下がるならNADを併用。'],
+         mil:['ok','これもアリ：β遮断下で強い','PDE3阻害でCI↑。血管拡張で血圧が下がりやすく、腎排泄なので腎機能を確認。'],
+         nad:['ng','いま引くレバーではない','MAPは保てています。後負荷を上げると弱った心臓がさらに苦しくなります。低血圧なら最初に使う薬。'],
+         vp:['ng','いま引くレバーではない','後負荷だけが上がり、COは増えません。'],
+         pe:['ng','逆効果','後負荷↑と反射性徐脈で、COがさらに落ちました。'],
+         fluid:['ng','前負荷はあふれている','CVP 16・PAWP 24。輸液は肺水腫を悪化させます。']}},
+    {n:'出血',d:'吐血が続く58歳。CVP 2、頻脈、四肢冷感。内視鏡の準備中。',b:{cvp:2,ci:1.8,svr:1500,hr:128},mod:{fluid:{cvp:5,ci:.6,svr:-60,hr:-14}},
+      r:{fluid:['best','正解：前負荷のレバー','タンクが空です。止血と輸血（RBC・FFP・PCのバランス）が主役。トラネキサム酸も早期に。'],
+         nad:['ng','空の血管を締めても','数字は上がっても中身は空。昇圧薬は輸血が間に合うまでの橋渡しに限ります。'],
+         vp:['ng','空の血管を締めても','血管抵抗はすでに高い（1500）。容量を戻すのが先です。'],
+         pe:['ng','空の血管を締めても','SVRは代償で高い。締めると臓器の血流がさらに減ります。'],
+         dob:['ng','空回り','前負荷がなければ収縮力を上げても拍出は増えず、頻脈が悪化します。'],
+         mil:['ng','危険','血管拡張で血圧が急落します。']}},
+    {n:'β遮断薬',d:'心不全でβ遮断薬を長期内服中の80歳。低心拍出で、DOBを始めたが反応が鈍い。',b:{cvp:14,ci:1.8,svr:1300,hr:64},mod:{dob:{cvp:0,ci:.2,svr:-60,hr:3}},
+      r:{mil:['best','正解：受容体を介さない強心薬','β受容体がブロックされていても、PDE3阻害でcAMPを上げられます。腎機能に応じて用量調整。'],
+         dob:['ng','効きにくい','β受容体が塞がれているので、増やしても反応が鈍いまま。'],
+         nad:['ok','血圧が下がるなら併用','MILの血管拡張で下がる血圧を支える役。単独ではCOは増えません。'],
+         vp:['ok','血圧が下がるなら併用','MIL併用時の血圧維持に。単独ではCOは増えません。'],
+         pe:['ng','逆効果','後負荷↑でCOがさらに低下しました。'],
+         fluid:['ng','前負荷は足りている','CVP 14。これ以上はうっ血を招きます。']}}
+  ];
+  let ci=0;
+  const tabs=$('#lvTabs');
+  C.forEach((c,k)=>{const b=el('button','btn',c.n);b.onclick=()=>pick(k);tabs.appendChild(b)});
+  const lv=$('#levers');
+  L.forEach(l=>{const r=el('div','lever',`<div class="nm">${l.n}<small>${l.s}</small></div><div class="lbar"><span class="band"></span><span class="ghost"></span><span class="fill"></span></div><div class="v"></div>`);r.dataset.k=l.k;lv.appendChild(r)});
+  const dr=$('#lvDrugs');
+  Object.entries(D).forEach(([k,d])=>{const b=el('button','btn',`${d.n}<small>${d.s}</small>`);b.dataset.k=k;b.onclick=()=>give(k);dr.appendChild(b)});
+  const pct=(l,v)=>Math.max(0,Math.min(100,(v-l.min)/(l.max-l.min)*100));
+  const mapOf=s=>Math.round(s.cvp+s.ci*BSA*s.svr/80);
+  function draw(base,after){
+    [...lv.children].forEach((r,j)=>{const l=L[j],b=base[l.k],a=after?after[l.k]:b;
+      r.querySelector('.band').style.left=pct(l,l.lo)+'%';r.querySelector('.band').style.width=(pct(l,l.hi)-pct(l,l.lo))+'%';
+      r.querySelector('.ghost').style.width=pct(l,b)+'%';r.querySelector('.fill').style.width=pct(l,a)+'%';
+      const v=r.querySelector('.v');v.textContent=l.f(a);v.className='v'+(after&&Math.abs(a-b)>.05?(a>b?' up':' dn'):'')});
+    const s=after||base,m=mapOf(s);$('#lvMAP').textContent=m;$('#lvMAP').classList.toggle('alarm',m<65);$('#lvCO').textContent=(s.ci*BSA).toFixed(1)}
+  function pick(k){ci=k;[...tabs.children].forEach((b,j)=>b.classList.toggle('sel',j===k));
+    const c=C[k];$('#lvDesc').innerHTML='<b>症例：</b>'+c.d;draw(c.b);
+    [...dr.children].forEach(b=>b.className='btn');
+    $('#lvVerdict').className='verdict';$('#lvVerdict').innerHTML='<span class="h">どのレバーが落ちている？</span>正常範囲は各バーの薄い緑の帯です。'}
+  function give(k){const c=C[ci],v=(c.mod&&c.mod[k])||D[k].v,a={};
+    L.forEach(l=>a[l.k]=Math.max(l.min,c.b[l.k]+v[l.k]));draw(c.b,a);
+    const [cls,h,t]=c.r[k];
+    [...dr.children].forEach(b=>{if(b.dataset.k===k)b.className='btn '+cls});
+    $('#lvVerdict').className='verdict '+cls;$('#lvVerdict').innerHTML=`<span class="h">${h}</span>${t}`;
+    if(cls==='best'){award('lv'+ci,5,'レバー的中');tabs.children[ci].classList.add('done');if(C.every((_,j)=>S.got['lv'+j]))clear(2)}}
+  pick(0);
+})();
+
+/* ---------- 4 ORGAN MAP ---------- */
+(()=>{
+  const O={
+    bronchi:{x:12,y:12,w:150,h:78,t:'気管支'},
+    lungpv:{x:198,y:12,w:150,h:78,t:'肺血管（右心の後負荷）'},
+    heart:{x:115,y:118,w:130,h:76,t:'心臓'},
+    vein:{x:8,y:120,w:92,h:130,t:'静脈'},
+    art:{x:260,y:120,w:92,h:130,t:'細動脈'},
+    kidney:{x:8,y:300,w:80,h:86,t:'腎臓'},
+    gut:{x:96,y:300,w:80,h:86,t:'腸管'},
+    liver:{x:184,y:300,w:80,h:86,t:'肝・代謝'},
+    skin:{x:272,y:300,w:80,h:86,t:'指先・皮膚'}
+  };
+  const svg=$('#body');
+  let s=`<defs><marker id="ar" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#4a6688"/></marker></defs>`;
+  s+=`<path class="flow a" d="M245 150 H258" marker-end="url(#ar)"/>`+
+     `<path class="flow a" d="M306 252 V296" marker-end="url(#ar)"/>`+
+     `<path class="flow v" d="M120 392 H54 V254" marker-end="url(#ar)"/>`+
+     `<path class="flow v" d="M102 160 H113" marker-end="url(#ar)"/>`+
+     `<path class="flow v" d="M200 116 V94" marker-end="url(#ar)"/>`+
+     `<path class="flow a" d="M240 94 V116" marker-end="url(#ar)"/>`+
+     '';
+  const wrapT=(t,x,w)=>{ // split long title into 2 lines
+    if(t.length<=7)return `<tspan x="${x}" dy="0">${t}</tspan>`;
+    const m=t.indexOf('（');if(m>0)return `<tspan x="${x}" dy="0">${t.slice(0,m)}</tspan><tspan x="${x}" dy="15" font-size="11" font-weight="400">${t.slice(m)}</tspan>`;
+    return `<tspan x="${x}" dy="0">${t}</tspan>`};
+  Object.entries(O).forEach(([k,o])=>{const cx=o.x+o.w/2;
+    s+=`<g class="org" id="o-${k}"><rect x="${o.x}" y="${o.y}" width="${o.w}" height="${o.h}" rx="10"/>`+
+       `<text class="t" text-anchor="middle" x="${cx}" y="${o.y+22}">${wrapT(o.t,cx,o.w)}</text>`+
+       `<text class="e" text-anchor="middle" x="${cx}" y="${o.y+o.h-24}"></text><text class="e e2" text-anchor="middle" x="${cx}" y="${o.y+o.h-9}"></text></g>`});
+  svg.innerHTML=s;
+  // [organ, kind(on/side/info), short1, short2, long]
+  const F=[
+    {n:'NAD',f:'ノルアドレナリン',rc:['α1','β1'],q:'「敗血症性ショックの初手は任せろ」',d:'0.05〜0.5 μg/kg/min',ph:'末梢投与は太い血管に。漏出時の対応を事前に決めておく',
+     m:[['art','on','α1 収縮','SVR↑↑','細動脈をα1で強く締め、血管抵抗を上げる（主作用）'],['vein','on','α1 収縮','還流↑','静脈も締まり、心臓に戻る血液が増える'],['heart','on','β1','収縮力↑','β1で収縮力を少し上げる。心拍はあまり上がらない'],['skin','side','高用量で','虚血','高用量や漏出で末梢の虚血・壊死'],['gut','side','高用量で','虚血','高用量で腸管虚血のリスク']]},
+    {n:'VP',f:'バソプレシン',rc:['V1','V2'],q:'「0.03単位/分で固定。タイトレーションはしない主義」',d:'0.03 単位/min（固定）',ph:'本邦では敗血症性ショックは適応外。NADより後に止める施設が多い',
+     m:[['art','on','V1 収縮','SVR↑','カテコラミンと別経路（V1）で血管を締める。アシドーシスでも効きやすい'],['heart','info','β作用なし','頻脈×','心拍数を上げないので不整脈が増えにくい'],['lungpv','info','PVRを','上げにくい','肺血管抵抗を上げにくく、右心不全で使いやすい'],['kidney','side','V2 水再吸収','低Na','V2作用で水が再吸収され、低Na血症'],['skin','side','指先','虚血','指先の虚血'],['gut','side','腸管','虚血','腸管虚血']]},
+    {n:'AD',f:'アドレナリン',rc:['α1','β1','β2'],q:'「アナフィラキシーなら私の出番」',d:'0.01〜0.5 μg/kg/min／筋注 0.01 mg/kg（最大0.5 mg）',ph:'心停止の1 mg静注と持続用の濃度を取り違えない',
+     m:[['heart','on','β1','収縮↑ 心拍↑','収縮力も心拍数も強く上げる'],['art','on','α1（高用量）','SVR↑','高用量ではα1で血管収縮'],['bronchi','on','β2','気管支拡張','β2で気管支を広げる（アナフィラキシーで重要）'],['liver','side','β2','乳酸↑ 血糖↑','β2で好気性解糖が進み乳酸↑。灌流不全と区別が必要'],['heart','side','','','頻脈・不整脈も出やすい']]},
+    {n:'DOA',f:'ドパミン',rc:['D1','β1','α1'],q:'「低用量で腎保護…は都市伝説でした」',d:'2〜20 μg/kg/min（用量で作用が変わる）',ph:'SOAP IIで不整脈増加。第一選択から外れた',
+     m:[['kidney','info','D1 拡張','保護は否定','低用量で腎血管を広げ尿は増えるが、腎保護効果は否定'],['heart','side','β1','不整脈↑','中用量でβ1。頻脈性不整脈がNADより多い'],['art','on','α1（高用量）','SVR↑','高用量でα1による血管収縮'],['gut','info','D1','腸間膜拡張','腸間膜血管も広げる']]},
+    {n:'PE',f:'フェニレフリン',rc:['α1'],q:'「βって誰ですか？」',d:'静注 0.1〜0.2 mg（希釈して）',ph:'持続投与の範囲は施設プロトコルで確認',
+     m:[['art','on','純α1','SVR↑','純粋なα1で血管を締める'],['vein','on','α1','還流↑','静脈も締まる'],['heart','side','反射性徐脈','CO↓','反射で心拍が下がり、拍出が落ちることも'],['heart','info','','',''],['skin','side','末梢','虚血','末梢の虚血']]},
+    {n:'DOB',f:'ドブタミン',rc:['β1','β2'],q:'「圧は上げない、拍出を上げる」',d:'2〜20 μg/kg/min（多くは2〜10）',ph:'β遮断薬内服中は効きにくい。頻脈・心房細動に注意',
+     m:[['heart','on','β1','収縮力↑↑','心収縮力を強く上げる（主作用）'],['art','side','β2 拡張','SVR↓','β2で血管が開き、血圧が下がることも'],['heart','side','','','頻脈・心房細動']]},
+    {n:'MIL',f:'ミルリノン',rc:['PDE3'],q:'「β遮断薬？関係ないね」',d:'0.25〜0.75 μg/kg/min（負荷投与は省略が多い）',ph:'腎排泄。腎機能低下で減量し、作用の遷延に注意',
+     m:[['heart','on','PDE3阻害','収縮力↑','受容体を介さずcAMPを上げる。β遮断下でも効く'],['art','side','拡張','SVR↓↓','強い血管拡張で血圧が下がりやすい'],['lungpv','on','拡張','PVR↓','肺血管を広げ、右心の負担を減らす'],['kidney','side','腎排泄','蓄積','腎機能低下で蓄積し、低血圧・不整脈が長引く']]},
+    {n:'Ang II',f:'アンジオテンシンII',rc:['AT1'],q:'「日本未上陸の転校生です」',d:'海外で 20 ng/kg/min から',ph:'本邦未承認。知識として押さえる',
+     m:[['art','on','AT1 収縮','SVR↑','第3の経路（AT1）で血管を締める'],['kidney','info','輸出細動脈','収縮','輸出細動脈を締め、糸球体内圧を保つ'],['vein','side','血栓症','抗凝固要','血栓塞栓症が増えるため予防的抗凝固が必要']]}
+  ];
+  const ALL=['α1','β1','β2','D1','V1','V2','AT1','PDE3'];
+  const ros=$('#roster'),seen=new Set();
+  function show(k){const f=F[k];$$('.fighter').forEach((b,j)=>b.classList.toggle('on',j===k));
+    $$('#body .org').forEach(g=>{g.setAttribute('class','org');g.querySelectorAll('.e').forEach(t=>t.textContent='')});
+    const used={};
+    f.m.forEach(([o,kind,a,b])=>{const g=$('#o-'+o);if(!g||!(a||b))return;if(used[o])return;used[o]=1;g.setAttribute('class','org '+kind);g.querySelector('.e').textContent=a;g.querySelector('.e2').textContent=b});
+    const col={on:'var(--hr)',side:'var(--abp)',info:'var(--spo2)'};
+    $('#statcard').innerHTML=`<h3>${f.f}</h3><div class="quote">${f.q}</div>
+      <div class="rec">${ALL.map(r=>`<span class="${f.rc.includes(r)?'on':''}">${r}</span>`).join('')}</div>
+      <ul class="effects">${f.m.filter(x=>x[4]).map(x=>`<li style="--c:${col[x[1]]}"><span><b>${O[x[0]].t.replace(/（.*/,'')}</b>：${x[4]}</span></li>`).join('')}</ul>
+      <dl class="kv"><dt>用量の目安</dt><dd class="num">${f.d}</dd><dt>薬剤師チェック</dt><dd>${f.ph}</dd></dl>`;
+    if(!seen.has(k)){seen.add(k);ros.children[k].classList.add('seen');award('f'+k,2,f.f+'を図鑑に登録');if(seen.size===F.length)setTimeout(()=>{award('fall',10,'図鑑コンプリート！');clear(3)},900)}}
+  F.forEach((f,k)=>{const b=el('button','fighter',f.n+'<small>'+f.f+'</small>');b.onclick=()=>show(k);ros.appendChild(b)});
+  $('#statcard').innerHTML='<h3>ファイターをタップ</h3><div class="quote">緑＝主作用、赤＝副作用・注意、青＝特徴。上のボタンから1人選んでください。</div><p class="note">循環の流れ：心臓 → 細動脈（抵抗血管）→ 臓器 → 静脈（容量血管）→ 心臓 → 肺。</p>';
+})();
+
+/* ---------- 5 VS ---------- */
+(()=>{
+  const V=[
+    {sc:'敗血症性ショック。輸液後もMAP 58。最初の昇圧薬は？',a:['NAD','ノルアドレナリン',['α1が主、β1少し','心拍はあまり上げない']],b:['DOA','ドパミン',['用量でD1→β1→α1','頻脈になりやすい']],w:0,
+      e:'NADの勝ち。SOAP IIでドパミンは不整脈が多く、心原性ショックの集団では死亡も多かった。SSC 2026もNADを強く推奨。'},
+    {sc:'β遮断薬を長期内服中。低心拍出で強心薬が必要。',a:['DOB','ドブタミン',['β1刺激','受容体が塞がれていると効きにくい']],b:['MIL','ミルリノン',['PDE3阻害','受容体を介さない']],w:1,
+      e:'MILの勝ち。β受容体を介さずcAMPを上げる。ただし血管拡張で血圧が下がりやすく、腎排泄なので腎機能で用量を見直す。'},
+    {sc:'閉塞性肥大型心筋症（HOCM）の患者が麻酔導入で低血圧。',a:['AD','アドレナリン',['β1で収縮力↑','心拍↑']],b:['PE','フェニレフリン',['純α1','心拍を上げない']],w:1,
+      e:'PEの勝ち。β刺激で収縮が強まると流出路の狭窄が悪化する。後負荷を上げて頻脈を避けるPEが向いている。'},
+    {sc:'造影剤のあと、喘鳴と血圧低下。アナフィラキシー。',a:['AD','アドレナリン',['α1・β1・β2すべて','気管支拡張']],b:['NAD','ノルアドレナリン',['α1が主','β2なし']],w:0,
+      e:'ADの勝ち。β2で気管支を広げ、肥満細胞からの放出も抑える。まず 0.01 mg/kg（成人最大0.5 mg）を大腿前外側に筋注。'},
+    {sc:'敗血症性ショック。NAD 0.3 μg/kg/minでもMAPが足りない。次の一手は？',a:['VP','バソプレシン',['V1受容体','カテコラミンと別経路']],b:['DOA','ドパミン',['カテコラミン','同じ経路の重ねがけ']],w:0,
+      e:'VPの勝ち。別経路で血管を締めてカテコラミンを節約する。SSC 2026は「NADが増えてきたら追加」を提案。0.03単位/minで固定。'}
+  ];
+  let vi=0;const tabs=$('#vsTabs');
+  V.forEach((v,k)=>{const b=el('button','btn','第'+(k+1)+'試合');b.onclick=()=>show(k);tabs.appendChild(b)});
+  function side(x,idx){const d=el('button','side',`<span class="num" style="color:var(--dim);font-size:12px">${x[0]}</span><h3>${x[1]}</h3><ul>${x[2].map(t=>'<li>'+t+'</li>').join('')}</ul>`);d.onclick=()=>judge(idx);return d}
+  function show(k){vi=k;[...tabs.children].forEach((b,j)=>b.classList.toggle('sel',j===k));const v=V[k];
+    $('#vsScene').innerHTML='<b>場面：</b>'+v.sc;const box=$('#vsBox');box.innerHTML='';
+    box.append(side(v.a,0),el('div','mid','VS'),side(v.b,1));
+    $('#vsVerdict').className='verdict';$('#vsVerdict').innerHTML='<span class="h">予想してください</span>受容体と、この場面で困っていることを考えて。'}
+  function judge(p){const v=V[vi],box=$('#vsBox'),sides=[box.children[0],box.children[2]];if(box.dataset.done==vi)return;box.dataset.done=vi;
+    sides.forEach((s,j)=>s.classList.add(j===v.w?'win':'lose'));if(p!==v.w)sides[p].classList.add('pick');
+    const ok=p===v.w;$('#vsVerdict').className='verdict '+(ok?'best':'ng');$('#vsVerdict').innerHTML=`<span class="h">${ok?'予想的中！':'残念、逆でした'}</span>${v.e}`;
+    if(ok){award('vs'+vi,4,'読み勝ち')}tabs.children[vi].classList.add('done');
+    if([...tabs.children].every(b=>b.classList.contains('done')))clear(4);
+    setTimeout(()=>{if(vi<V.length-1&&box.dataset.done==vi)show(vi+1)},4200)}
+  show(0);
+})();
+
+/* ---------- 6 CALC ---------- */
+(()=>{const dr=$('#cDrug'),w=$('#cW'),d=$('#cD');
+  const cfg=()=>{const [c,mn,mx,def]=dr.value.split('|').map(Number);return {c,mn,mx,def}};
+  function setRange(){const k=cfg();d.min=k.mn;d.max=k.mx;d.step=k.mx>5?0.5:0.01;d.value=k.def;upd()}
+  function upd(){const k=cfg(),W=+w.value,D=+d.value;$('#oW').textContent=W+' kg';$('#oD').textContent=D+' μg/kg/min';$('#oRate').textContent=(D*W*60/k.c).toFixed(1)}
+  dr.onchange=setRange;w.oninput=upd;d.oninput=upd;upd();
+  const Q=[{w:50,r:5},{w:40,r:8},{w:60,r:9}];let qi=0;
+  function ask(){const q=Q[qi],ans=+(q.r/q.w).toFixed(2);$('#qNo').textContent=(qi+1)+' / '+Q.length;
+    $('#qText').textContent=`体重 ${q.w} kg、NAD 3 mg/50 mL を ${q.r} mL/h。今の用量は？`;
+    const opts=shuffle([ans,+(ans*2).toFixed(3),+(ans/2).toFixed(3),+(ans*.6).toFixed(3)]);const box=$('#qOpts');box.innerHTML='';$('#qFb').textContent='';
+    opts.forEach(v=>{const b=el('button','opt num',v+' μg/kg/min');b.onclick=()=>{if(box.dataset.lock)return;box.dataset.lock=1;const ok=v===ans;b.classList.add(ok?'right':'wrong');
+      [...box.children].forEach(x=>{if(x.textContent.startsWith(ans+' '))x.classList.add('right')});
+      const fb=$('#qFb');fb.className='feedback '+(ok?'ok':'ng');fb.textContent=(ok?'正解。':'惜しい。')+`${q.r} mL/h × 60 μg/mL ＝ ${q.r*60} μg/h ＝ ${q.r} μg/min。${q.w} kg で割って ${ans}。`;
+      if(ok)award('q'+qi,5,'暗算マスター');
+      setTimeout(()=>{delete box.dataset.lock;qi++;if(qi<Q.length)ask();else{$('#qText').textContent='3問終了。この式は夜勤の救世主です。';box.innerHTML='';clear(5)}},2600)};box.appendChild(b)})}
+  ask();
+})();
+
+/* ---------- 7 BOSS RUSH ---------- */
+(()=>{
+  const g=(c,t)=>[c,t];
+  const CASES=[
+  {id:'sep',tab:'敗血症',title:'BOSS 1　肺炎からの敗血症性ショック',desc:'68歳。MAP 54、乳酸 4.8。抗菌薬と血液培養は済み。正しい順番だとよく効きます。',
+   init:{map:54,hr:122,lac:4.8},x:null,goal:s=>s.map>=65,goalTxt:'クリア条件：MAP 65以上',
+   acts:[
+    ['晶質液 30 mL/kg（3時間で）',s=>{if(s.fluid){s.map-=1;return g('r','2回目の30 mL/kg…肺が水浸しに。急性期を過ぎたら除水も考えます。')}s.fluid=1;s.map+=4;s.lac-=.6;s.tags.push('輸液済');return g('g','輸液でMAP +4。BMI 30超なら調整体重で計算。')}],
+    ['NAD開始 0.1 μg/kg/min',s=>{if(s.nad)return g('y','もう流れています。増やすなら「NAD増量」。');s.nad=.1;s.map+=4;s.tags.push('NAD');return g('g','NAD開始。第一選択。CVを待たず末梢から始めてOK（SSC 2026で提案）。'+(s.fluid?'':' ところで輸液は？'))}],
+    ['NAD増量 +0.1',s=>{if(!s.nad)return g('r','まだNADが始まっていません。');if(s.nad>=.3){s.hr+=6;return g('r','0.3を超えても上がらない。別経路の薬を足す頃合い。')}s.nad=+(s.nad+.1).toFixed(2);s.map+=1;s.hr+=2;return g(s.nad>=.3?'y':'g','NAD '+s.nad.toFixed(2)+'。'+(s.nad>=.3?'SSC委員の実践ではこのあたりでVPを足します。':'MAP +1。'))}],
+    ['VP追加 0.03 単位/min',s=>{if(s.vp)return g('y','VPは0.03で固定。増やしません。');if(!s.nad)return g('r','いきなりVP単独は第一選択ではありません。NADが先。');s.vp=1;s.tags.push('VP');if(s.nad<.25){s.map+=3;return g('y','効きましたが、NAD増量の余地はまだありました。')}s.map+=4;s.hr-=4;return g('g','VP追加でMAP +4。カテコラミンを節約。')}],
+    ['ヒドロコルチゾン 200 mg/日',s=>{if(s.hc)return g('y','もう入っています。フルドロコルチゾン 50 μg の経管投与も検討。');s.hc=1;s.tags.push('HC');if(s.nad<.25&&!s.vp){s.map+=1;return g('y','高用量の昇圧薬が続くときに使うのが基本。')}s.map+=2;return g('g','50 mg を6時間ごと。ショック離脱が早まる。血糖とNaを見張る。')}],
+    ['AD追加',s=>{if(s.ad)return g('y','もう入っています。');s.ad=1;s.tags.push('AD');if(!(s.nad&&s.vp)){s.map+=3;s.hr+=12;s.lac+=1.2;return g('r','早すぎるAD。頻脈と、β2による乳酸上昇。NADとVPが先。')}s.map+=4;s.hr+=8;s.lac+=.5;return g('g','NAD＋VPで足りないときのAD追加は正しい一手（提案）。')}],
+    ['低用量ドパミンで腎保護',s=>{s.hr+=15;return g('r','心房細動が出た…。腎保護効果は否定済み。')}],
+    ['高用量ビタミンC',s=>g('r','LOVIT試験では死亡または臓器障害の持続が増えた。簡易血糖計の偽高値にも注意。')]
+   ]},
+  {id:'card',tab:'心原性',title:'BOSS 2　急性心筋梗塞の心原性ショック',desc:'72歳、前壁梗塞でPCI後。MAP 58、CI 1.6、PAWP 25。圧とポンプの両方を立て直してください。',
+   init:{map:58,hr:108,lac:4.2,x:1.6},x:{lbl:'CI',u:'L/min/m²',c:'v-sp',f:v=>v.toFixed(1)},goal:s=>s.map>=65&&s.x>=2.2,goalTxt:'クリア条件：MAP 65以上 かつ CI 2.2以上',
+   acts:[
+    ['輸液 500 mL ボーラス',s=>{s.lac+=.2;return g('r','PAWP 25に輸液…肺水腫が悪化。SpO2が下がりました。')}],
+    ['NAD開始',s=>{if(s.nad)return g('y','もう流れています。');s.nad=1;s.map+=6;s.x+=.1;s.tags.push('NAD');return g('g','まず圧を作る。低血圧の心原性ショックでもDOAよりNAD。')}],
+    ['DOB開始',s=>{if(s.dob)return g('y','もう流れています。');s.dob=1;s.tags.push('DOB');s.hr+=6;if(s.nad){s.map+=2;s.x+=.6;return g('g','DOBで拍出↑。NADが支えているので血圧も保てた。')}s.map-=2;s.x+=.5;return g('y','拍出は上がったが、β2で血圧が下がった。先にNADで圧を。')}],
+    ['ミルリノン開始',s=>{if(s.mil)return g('y','もう流れています。');s.mil=1;s.tags.push('MIL');s.x+=.5;s.map-=s.nad?2:5;return g('y','PDE3でCI↑、血管拡張で血圧↓。腎機能を確認し、負荷投与は省略が無難。DOREMIではDOBと差なし。')}],
+    ['ドパミン開始',s=>{s.hr+=15;return g('r','VTが出た！SOAP IIの心原性サブグループではDOAで死亡が多かった。')}],
+    ['AD開始',s=>{s.map+=4;s.hr+=15;s.lac+=1.5;s.tags.push('AD');return g('r','OptimaCC試験では、ADはNADより難治性ショックが多く中止された。乳酸も上昇。')}],
+    ['機械的補助を相談',s=>{if(s.mcs)return g('y','循環器チームが検討中です。');s.mcs=1;s.map+=2;s.x+=.3;s.tags.push('MCS');return g('g','IABP・Impella・VA-ECMOを検討。ヘパリンの抗凝固管理は薬剤師の出番。')}],
+    ['利尿薬でうっ血をとる',s=>{if(s.map<65)return g('y','血圧が低いうちは利尿で血圧がさらに下がりやすい。先に循環を立て直す。');return g('g','血圧が保てたので、うっ血に対してフロセミドを検討。')}]
+   ]},
+  {id:'ana',tab:'アナフィラキシー',title:'BOSS 3　β遮断薬内服中のアナフィラキシー',desc:'55歳、ビソプロロール内服中。造影CT直後に喘鳴、全身の蕁麻疹、MAP 50。',
+   init:{map:50,hr:62,lac:3.0,x:89},x:{lbl:'SpO2',u:'%',c:'v-sp',f:v=>v.toFixed(0)},goal:s=>s.map>=65,goalTxt:'クリア条件：MAP 65以上',
+   acts:[
+    ['AD 0.5 mg 筋注（大腿前外側）',s=>{s.im=(s.im||0)+1;if(s.im===1){s.map+=6;s.x+=3;s.hr+=8;s.tags.push('AD筋注');return g('g','0.01 mg/kg（成人最大0.5 mg）。まずこれ。でもβ遮断で反応が鈍い…')}if(s.im===2){s.map+=2;return g('y','5〜15分あけて反復可。効きはいまひとつ。')}return g('y','筋注の繰り返しより、持続静注かグルカゴンを。')}],
+    ['大量輸液 1〜2 L',s=>{if(s.fl)return g('y','すでに入っています。');s.fl=1;s.map+=5;s.tags.push('輸液');return g('g','血管外に血漿が漏れて循環血液量が激減している。輸液は本気で。')}],
+    ['グルカゴン 1〜5 mg 静注',s=>{if(s.gl)return g('y','もう入っています。持続投与も選択肢。');s.gl=1;s.tags.push('グルカゴン');s.map+=s.im?5:3;s.hr+=10;return g(s.im?'g':'y',(s.im?'':'ADより先ではありません。')+'β受容体を介さずcAMP↑。嘔吐で誤嚥しないよう体位に注意。')}],
+    ['AD持続静注 0.05 μg/kg/min',s=>{if(s.adiv)return g('y','もう流れています。');s.adiv=1;s.map+=4;s.hr+=12;s.tags.push('AD持続');return g(s.im?'g':'y',(s.im?'筋注で足りないときの次の手。':'まずは筋注から。')+'濃度の取り違えに注意。')}],
+    ['抗ヒスタミン薬 静注',s=>g('r','皮膚症状には効くが、血圧と気道は救えない。ADの代わりにはならない。')],
+    ['ヒドロコルチゾン 静注',s=>g('y','即効性はなし。二相性反応の予防も根拠は乏しい。')],
+    ['β2刺激薬の吸入',s=>{s.x+=2;return g('y','喘鳴には補助的に。血圧は上がらない。')}]
+   ]},
+  {id:'pe',tab:'肺塞栓',title:'BOSS 4　広範型肺塞栓（右心不全）',desc:'64歳、術後5日目に突然の呼吸困難。右室が拡大し、MAP 56。右心を守りながら原因を治してください。',
+   init:{map:56,hr:124,lac:3.6,x:86},x:{lbl:'SpO2',u:'%',c:'v-sp',f:v=>v.toFixed(0)},goal:s=>s.map>=65&&s.lys,goalTxt:'クリア条件：MAP 65以上 かつ 原因治療',
+   acts:[
+    ['輸液 1 L 急速投与',s=>{s.map-=3;return g('r','拡大した右室にさらに容量…中隔が左室を押しつぶし、拍出が落ちた。')}],
+    ['輸液 250 mL を慎重に',s=>{if(s.sf)return g('y','これ以上は右室を張らせます。');s.sf=1;s.map+=1;return g('y','少量ならよい。反応を見ながら。')}],
+    ['NAD開始',s=>{if(s.nad)return g('y','もう流れています。');s.nad=1;s.map+=6;s.tags.push('NAD');return g('g','体血圧を上げて右冠動脈の灌流を守る。右心不全の基本。')}],
+    ['VP追加',s=>{if(s.vp)return g('y','もう流れています。');s.vp=1;s.map+=2;s.tags.push('VP');return g(s.nad?'g':'y','肺血管抵抗を上げにくいのが利点。'+(s.nad?'':'まずNADから。'))}],
+    ['DOB 少量',s=>{if(s.dob)return g('y','もう流れています。');s.dob=1;s.tags.push('DOB');if(s.nad){s.map+=1;return g('g','弱った右室の収縮を助ける。')}s.map-=2;return g('y','単独だと血管拡張で血圧が下がる。')}],
+    ['ミルリノン開始',s=>{s.map-=4;return g('r','肺血管は開くが体血圧も落ちる。ショック中に単独では使いにくい。')}],
+    ['血栓溶解薬（モンテプラーゼ）',s=>{if(s.lys)return g('y','投与済みです。');s.lys=1;s.map+=7;s.x+=6;s.hr-=15;s.tags.push('血栓溶解');return g('g','原因治療。本邦で肺塞栓に適応があるのはモンテプラーゼ。出血リスクの禁忌チェックとヘパリンの調整は薬剤師の出番。')}],
+    ['フェニレフリン単独',s=>{s.map+=1;return g('y','体血圧は少し上がるが、肺血管も締まりうる。NADのほうが無難。')}]
+   ]},
+  {id:'vaso',tab:'術後血管麻痺',title:'BOSS 5　心臓術後の血管麻痺（vasoplegia）',desc:'70歳、弁置換術後。NAD 0.3 μg/kg/minでもMAP 55。CIは3.4と高く、血管だけが開ききっている。',
+   init:{map:55,hr:96,lac:3.2,x:3.4},x:{lbl:'CI',u:'L/min/m²',c:'v-sp',f:v=>v.toFixed(1)},goal:s=>s.map>=65&&!s.miss,goalTxt:'クリア条件：MAP 65以上（見落としなしで）',
+   acts:[
+    ['NAD増量 0.5へ',s=>{if(s.up)return g('y','これ以上の増量は虚血のリスクが勝ちます。');s.up=1;s.map+=2;return g('y','上がりが鈍い。カテコラミンだけでは限界。')}],
+    ['VP追加 0.03 単位/min',s=>{if(s.vp)return g('y','もう流れています。');s.vp=1;s.map+=5;s.tags.push('VP');return g('g','術後血管麻痺の定番。別経路で締める。')}],
+    ['ヒドロコルチゾン',s=>{if(s.hc)return g('y','もう入っています。');s.hc=1;s.map+=2;s.tags.push('HC');return g('g','相対的副腎不全への対応。血糖に注意。')}],
+    ['持参薬を確認する',s=>{if(s.chk)return g('y','確認済み：エスシタロプラム（SSRI）内服中。');s.chk=1;return g('y','エスシタロプラム（SSRI）を内服中！これは大事な情報。')}],
+    ['メチレンブルー 2 mg/kg',s=>{if(s.chk)return g('y','SSRI内服中なのでセロトニン症候群のリスク。今回は見送り、別の手を医師と相談。');if(s.mb)return g('r','すでに投与済み。');s.mb=1;s.miss=1;s.map+=6;s.tags.push('MB');return g('r','MAPは上がったが、SSRI内服を見落とした！MAO阻害作用でセロトニン症候群のリスク。G6PD欠損でも溶血。やり直そう。')}],
+    ['ヒドロキソコバラミン 5 g',s=>{if(s.hx)return g('y','投与済みです。');s.hx=1;s.map+=4;s.tags.push('ヒドロキソコバラミン');return g('g','NOを捕捉して血管を締める。尿と皮膚が赤くなり、透析の漏血アラームが誤作動することも。本邦の適応はシアン中毒のみ。')}],
+    ['ドブタミン追加',s=>{s.map-=3;s.hr+=10;return g('r','CIは既に3.4。β2で血管がさらに開いた。')}]
+   ]}
+  ];
+  let ci=0,st;
+  const tabs=$('#bTabs');
+  CASES.forEach((c,k)=>{const b=el('button','btn',c.tab);b.onclick=()=>load(k);tabs.appendChild(b)});
+  function log(c,t){const p=el('div',c);p.textContent='> '+t;const L=$('#bLog');L.appendChild(p);L.scrollTop=L.scrollHeight}
+  function render(){const c=CASES[ci];
+    let h=`<div class="vital"><span class="lbl v-abp">MAP</span><span class="val v-abp num ${st.map<65?'alarm':''}">${st.map}</span><span class="unit">mmHg</span></div>
+      <div class="vital"><span class="lbl v-hr">HR</span><span class="val v-hr num">${st.hr}</span><span class="unit">bpm</span></div>
+      <div class="vital"><span class="lbl v-al">LAC</span><span class="val v-al num">${st.lac.toFixed(1)}</span><span class="unit">mmol/L</span></div>`;
+    if(c.x)h+=`<div class="vital"><span class="lbl ${c.x.c}">${c.x.lbl}</span><span class="val ${c.x.c} num">${c.x.f(st.x)}</span><span class="unit">${c.x.u}</span></div>`;
+    $('#bMon').innerHTML=h;$('#bBar').style.width=Math.min(100,st.map)+'%';
+    $('#bPills').innerHTML=[...new Set(st.tags)].map(t=>`<span class="pill">${t}</span>`).join('')}
+  function load(k){ci=k;const c=CASES[k];[...tabs.children].forEach((b,j)=>b.classList.toggle('sel',j===k));
+    st=Object.assign({tags:[]},JSON.parse(JSON.stringify(c.init)));
+    $('#bTitle').textContent=c.title;$('#bDesc').textContent=c.desc;$('#bGoal').textContent=c.goalTxt;$('#bLog').innerHTML='';
+    log('y','BED 01：'+c.desc.split('。')[0]+'。');
+    const A=$('#bActs');A.innerHTML='';
+    shuffle(c.acts).forEach(a=>{const b=el('button','btn');b.textContent=a[0];b.onclick=()=>act(a);A.appendChild(b)});
+    render()}
+  function act(a){const c=CASES[ci];
+    if(st.won){log('g','クリア済み。ほかの症例タブへどうぞ。');return}
+    const [cls,msg]=a[1](st);log(cls,msg);st.lac=Math.max(1,+st.lac.toFixed(1));st.x=st.x!=null?+(+st.x).toFixed(1):st.x;
+    if(c.goal(st)){st.won=1;st.lac=Math.max(1,+(st.lac-1.5).toFixed(1));log('g',`クリア！MAP ${st.map}。乳酸も下がり始めました。`);
+      S.boss[c.id]=1;tabs.children[ci].classList.add('done');award('b-'+c.id,20,c.tab+'を撃破！');
+      if(CASES.every(x=>S.boss[x.id]))clear(6)}
+    else if(st.miss&&st.map>=65){log('r','数字は合格でも、見落としがあれば不合格。「この症例をやり直す」から再挑戦。')}
+    render()}
+  $('#bReset').onclick=()=>load(ci);
+  load(0);
+})();
+
+/* ---------- 8 FLIPS ---------- */
+(()=>{const C=[
+  ['30','mL/kg','最初の3時間の晶質液（提案・低）。BMI 30超は調整体重か理想体重で。'],
+  ['65±5','mmHg','初期目標MAP。点ではなく幅で管理（推奨・中）。'],
+  ['60–65','mmHg、65歳以上','高齢者はこちらの範囲を提案（低）。'],
+  ['0.3','μg/kg/min','VPを足すときのNAD用量。委員の実践の中央値で、決まった閾値ではない。'],
+  ['末梢OK','','CV確保を待たず、末梢から昇圧薬を始めることを提案。'],
+  ['NAD','第一選択','ドパミン・ADよりNAD（強い推奨）。VPよりNADは「提案」に格下げ。']];
+  const box=$('#flips'),open=new Set();
+  C.forEach((c,k)=>{const b=el('button','flip',`<span class="face front"><span class="big">${c[0]}</span><small>${c[1]}</small></span><span class="face back">${c[2]}</span>`);b.setAttribute('aria-label',c[0]+' '+c[1]);
+    b.onclick=()=>{b.classList.toggle('open');open.add(k);if(open.size===C.length){award('flip',10,'6枚コンプリート');clear(7)}};box.appendChild(b)});
+})();
+
+/* ---------- 9 QUICK ---------- */
+(()=>{const Q=[
+  {q:'アドレナリン開始後に乳酸が 2 → 5 mmol/L。まず考える機序は？',o:['β2刺激による好気性解糖の亢進','必ず組織灌流の悪化','肝臓での乳酸代謝の亢進'],e:'灌流不全でなくても乳酸は上がる。尿量・CRT・皮膚の色など他の指標と合わせて判断。'},
+  {q:'バソプレシン投与中に起こりやすい電解質異常は？',o:['低Na血症','高K血症','低Ca血症'],e:'V2受容体で水の再吸収が増え、薄まって低Naに。NaはVPを止めた後も追いかける。'},
+  {q:'ミルリノンで減量や作用の遷延を特に意識すべき患者は？',o:['腎機能が低下している','肝機能が低下している','高齢で体重が軽い'],e:'腎排泄型。腎機能低下で蓄積し、低血圧や不整脈が長引く。オルプリノン（コアテック）も腎排泄。'},
+  {q:'カテコラミンの効きが悪くなる血液ガス所見は？',o:['重度のアシドーシス','軽度のアルカローシス','高CO2血症だけ'],e:'pH 7.15前後を下回ると受容体の反応が落ちる。VPはこの影響を受けにくい。'},
+  {q:'APROCCHSSで使われたフルドロコルチゾン。日本での投与方法は？',o:['錠剤 50 μg を経口・経管で1日1回','静注剤を1日1回','貼付剤を1日1回'],e:'静注剤はない。フロリネフ錠 0.1 mg を半錠にして経管投与。簡易懸濁の可否を確認。'}];
+  let i=0;
+  function ask(){const q=Q[i];$('#fNo').textContent='Q'+(i+1)+' / '+Q.length;$('#fText').textContent=q.q;$('#fFb').textContent='';$('#fNext').hidden=true;
+    const box=$('#fOpts');box.innerHTML='';
+    shuffle(q.o.map((t,k)=>({t,k}))).forEach(o=>{const b=el('button','opt');b.textContent=o.t;
+      b.onclick=()=>{if(box.dataset.lock)return;box.dataset.lock=1;const ok=o.k===0;b.classList.add(ok?'right':'wrong');
+        [...box.children].forEach(x=>{if(x.textContent===q.o[0])x.classList.add('right')});
+        const fb=$('#fFb');fb.className='feedback '+(ok?'ok':'ng');fb.textContent=(ok?'正解！':'残念。')+q.e;if(ok)award('fq'+i,5,'早押し成功');
+        $('#fNext').hidden=false;$('#fNext').textContent=i<Q.length-1?'次の問題 →':'おわり'};box.appendChild(b)})}
+  $('#fNext').onclick=()=>{delete $('#fOpts').dataset.lock;i++;if(i<Q.length)ask();else{$('#fText').textContent='5問終了。副作用と剤形を押さえるのが薬剤師の強み。';$('#fOpts').innerHTML='';$('#fFb').textContent='';$('#fNext').hidden=true;clear(8)}};
+  ask();
+})();
+
+/* ---------- 10 SWIPE ---------- */
+(()=>{const C=[
+  ['NADのラインに炭酸水素Naを合流させる',0,'カテコラミンはアルカリで失活します。'],
+  ['NADと同じラインから抗菌薬をワンショット',0,'ライン内のNADが一気に押し出され、血圧が急上昇します。'],
+  ['シリンジ交換は、新しいほうを先に流してから古いほうを止める',1,'並列交換で血圧の谷をつくりません。'],
+  ['末梢から開始。前腕の太い血管に20G',1,'SSC 2026も末梢からの開始を提案。刺入部はこまめに観察。'],
+  ['末梢から開始。手背の細い血管に24G',0,'漏れやすく、漏れたときの被害も大きい場所です。'],
+  ['漏れた！まず投与を止めて、カテーテルから吸引',1,'その後フェントラミンの局注を検討。自院での入手方法を事前に確認。'],
+  ['NADのラインにフロセミドを側注',0,'フロセミドもアルカリ性。同じラインは避けます。']];
+  const deck=$('#deck');let i=0;const order=shuffle(C);
+  function draw(){deck.innerHTML='';
+    if(i>=order.length){deck.innerHTML='<div class="scard" style="cursor:default;text-align:center"><span class="no">ALL CLEAR</span>7枚おわり。ライン管理は薬剤師の出番です。</div>';clear(9);return}
+    for(let k=Math.min(order.length-1,i+1);k>=i;k--){const c=order[k],e=el('div','scard',`<span class="stamp l">ナシ</span><span class="stamp r">アリ</span><span class="no">CARD ${k+1} / ${order.length}</span><div>${c[0]}</div>`);
+      if(k>i){e.style.transform='scale(.95) translateY(10px)';e.style.opacity='.6'}else bind(e);deck.appendChild(e)}}
+  function bind(e){let x0=null,dx=0;
+    e.addEventListener('pointerdown',ev=>{x0=ev.clientX;e.setPointerCapture(ev.pointerId);e.style.transition='none'});
+    e.addEventListener('pointermove',ev=>{if(x0===null)return;dx=ev.clientX-x0;e.style.transform=`translateX(${dx}px) rotate(${dx/18}deg)`;e.querySelector('.stamp.r').style.opacity=Math.max(0,dx/100);e.querySelector('.stamp.l').style.opacity=Math.max(0,-dx/100)});
+    e.addEventListener('pointerup',()=>{if(x0===null)return;x0=null;e.style.transition='';if(Math.abs(dx)>80)answer(dx>0?1:0);else{e.style.transform='';e.querySelectorAll('.stamp').forEach(s=>s.style.opacity=0)}dx=0})}
+  function answer(v){if(i>=order.length)return;const c=order[i],top=deck.lastElementChild,ok=v===c[1];
+    top.style.transform=`translateX(${v?140:-140}%) rotate(${v?20:-20}deg)`;top.style.opacity='0';
+    const fb=$('#swFb');fb.className='feedback '+(ok?'ok':'ng');fb.textContent=(ok?'正解：':'不正解：')+(c[1]?'アリ。':'ナシ。')+c[2];
+    if(ok)award('sw'+C.indexOf(c),3,c[1]?'アリ！':'ナシ！');i++;setTimeout(draw,320)}
+  $('#swYes').onclick=()=>answer(1);$('#swNo').onclick=()=>answer(0);draw();
+})();
+
+/* ---------- 11 ORDER ---------- */
+(()=>{const O=['アドレナリン・強心薬を減らす','NADを少しずつ減らす','VPを中止する','ステロイドを終了する'];
+  const T=['βの強い薬から外しましょう。','NADを少しずつ。VPを先に止めると低血圧が多いという報告があります。','VPは最後のほうで止めます。','昇圧薬から離脱したらステロイドも終了。漸減するかは施設で統一を。'];
+  const box=$('#order');let next=0;
+  shuffle(O.map((t,k)=>({t,k}))).forEach(o=>{const b=el('button','step',`<span class="n">?</span><span>${o.t}</span>`);
+    b.onclick=()=>{if(b.classList.contains('done')||next>=O.length)return;const fb=$('#oFb');
+      if(o.k===next){b.classList.add('done');b.querySelector('.n').textContent=next+1;next++;fb.className='feedback ok';fb.textContent=T[o.k];if(next===O.length){award('order',10,'離脱の達人');clear(10)}}
+      else{b.classList.remove('shake');void b.offsetWidth;b.classList.add('shake');fb.className='feedback ng';fb.textContent='まだ早いです。いちばん「強い」ものから外しましょう。'}};box.appendChild(b)});
+})();
+
+/* ---------- 12 RESULT ---------- */
+function renderResult(){const p=S.xp/MAX;
+  const rank=p>=.85?'MAP65の守護神':p>=.6?'昇圧マイスター':p>=.3?'ICU薬剤師 Lv.2':'見習い（シリンジ運び係）';
+  const cl=[1,2,3,4,5,7,8,9,10].filter(k=>S.clear[k]).length,bs=Object.keys(S.boss).length;
+  $('#rank').textContent=rank;$('#rXP').textContent=S.xp;$('#rMax').textContent='/ '+MAX+' XP';$('#rClear').textContent=cl;$('#rBoss').textContent=bs;
+  $('#shareText').textContent=`昇圧薬クエストで「${rank}」になった！\nXP ${S.xp}/${MAX}・ボス ${bs}/5 撃破\nSVRが落ちたらNAD、ポンプが落ちたらDOB。\n#ICU薬剤師 #昇圧薬クエスト`}
+$('#copyBtn').onclick=async()=>{const fb=$('#copyFb');try{await navigator.clipboard.writeText($('#shareText').textContent);fb.className='feedback ok';fb.textContent='コピーしました。Xの投稿にそのまま貼れます。'}catch(e){fb.className='feedback ng';fb.textContent='コピーできませんでした。上の文章を長押しして選択してください。'}};
+$('#restart').onclick=()=>{S={i:0,xp:0,got:{},clear:{},boss:{}};location.reload()};
+
+/* ---------- boot ---------- */
+function start(data){if(data&&typeof data.xp==='number'){S.xp=data.xp;S.got=data.got||{};S.clear=data.clear||{};S.boss=data.boss||{};$('#xp').textContent='XP '+S.xp}go(data&&data.i?data.i:0)}
+window.claude?.hot?.snapshot?.(()=>({i:S.i,xp:S.xp,got:S.got,clear:S.clear,boss:S.boss}));
+window.claude?.hot?.ready ? window.claude.hot.ready(start) : start(window.claude?.hot?.data ?? {});
+})();
+</script>
+</body>
+</html>
